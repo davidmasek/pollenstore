@@ -8,5 +8,11 @@ class MemoryStorage:
     def get(self, key: str) -> str:
         return self.data.get(key, "")
 
+    def remove(self, key: str) -> None:
+        try:
+            del self.data[key]
+        except KeyError:
+            pass
+
     def close(self) -> None:
         return None

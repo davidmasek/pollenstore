@@ -70,7 +70,7 @@ class DiskStorage:
             pass the full file location too.
     """
 
-    def __init__(self, file_name: str = "data.db"):
+    def __init__(self, file_name: str):
         self.file_name = file_name
         self.key_dir: dict[str, KeyEntry] = {}
         self.write_position: int = 0
@@ -87,8 +87,11 @@ class DiskStorage:
         self.file.flush()
         os.fsync(self.file.fileno())
 
+    def list(self) -> list[str]:
+        return list(self.key_dir.keys())
+
     def _init_key_dir(self) -> None:
-        print("****----------initialising the database----------****")
+        print(f"--- loading DB from {self.file_name} ---")
         with open(self.file_name, "rb") as f:
             while header_bytes := f.read(HEADER_SIZE):
                 timestamp, key_size, value_size = decode_header(data=header_bytes)
@@ -103,8 +106,7 @@ class DiskStorage:
                 )
                 self.key_dir[key] = kv
                 self.write_position += total_size
-                print(f'loaded key "{key}"')
-        print("****----------initialisation complete----------****")
+        print(f"--- loaded {len(self.key_dir):,} keys ---")
 
     def set(self, key: str, value: str) -> None:
         ts = int(time.time())
@@ -120,6 +122,13 @@ class DiskStorage:
         self.file.seek(entry.position)
         ts, key, value = decode_kv(self.file.read(entry.size))
         return value
+
+    def remove(self, key: str) -> None:
+        if key in self.key_dir:
+            # overwrite with empty value on disk
+            self.set(key, "")
+            # remove from in-memory storage
+            del self.key_dir[key]
 
     def close(self) -> None:
         self.file.flush()

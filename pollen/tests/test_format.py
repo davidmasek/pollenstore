@@ -2,8 +2,9 @@ import random
 import struct
 import time
 import typing
-import unittest
 import uuid
+
+import pytest
 
 from pollen.format import (
     HEADER_SIZE,
@@ -15,8 +16,6 @@ from pollen.format import (
 
 
 def get_random_header() -> tuple[int, int, int]:
-    # we use 4 bytes to store the int, so max value cannot be greater than
-    # the following
     max_size: int = (2**32) - 1
 
     def random_int() -> int:
@@ -47,51 +46,61 @@ class KeyValue(typing.NamedTuple):
     sz: int
 
 
-class TestHeaderOp(unittest.TestCase):
+class TestHeaderOp:
     def header_test(self, tt: Header) -> None:
         data = encode_header(tt.timestamp, tt.key_size, tt.val_size)
         t, k, v = decode_header(data)
-        self.assertEqual(tt.timestamp, t)
-        self.assertEqual(tt.key_size, k)
-        self.assertEqual(tt.val_size, v)
+        assert tt.timestamp == t
+        assert tt.key_size == k
+        assert tt.val_size == v
 
-    def test_header_serialisation(self) -> None:
-        tests: typing.List[Header] = [
+    @pytest.mark.parametrize(
+        "tt",
+        [
             Header(10, 10, 10),
             Header(0, 0, 0),
             Header(10000, 10000, 10000),
-        ]
-        for tt in tests:
-            self.header_test(tt)
+        ],
+    )
+    def test_header_serialisation(self, tt: Header) -> None:
+        self.header_test(tt)
 
     def test_random(self) -> None:
         for _ in range(100):
             tt = Header(*get_random_header())
             self.header_test(tt)
 
-    def test_bad(self) -> None:
-        # trying to encode an int with size more than 4 bytes should raise an error
-        self.assertRaises(struct.error, encode_header, 2**32, 5, 5)
-        self.assertRaises(struct.error, encode_header, 5, 2**32, 5)
-        self.assertRaises(struct.error, encode_header, 5, 5, 2**32)
+    @pytest.mark.parametrize(
+        "args",
+        [
+            (2**32, 5, 5),
+            (5, 2**32, 5),
+            (5, 5, 2**32),
+        ],
+    )
+    def test_bad(self, args: tuple[int, int, int]) -> None:
+        with pytest.raises(struct.error):
+            encode_header(*args)
 
 
-class TestEncodeKV(unittest.TestCase):
+class TestEncodeKV:
     def kv_test(self, tt: KeyValue) -> None:
         sz, data = encode_kv(tt.timestamp, tt.key, tt.val)
         t, k, v = decode_kv(data)
-        self.assertEqual(tt.timestamp, t)
-        self.assertEqual(tt.key, k)
-        self.assertEqual(tt.val, v)
-        self.assertEqual(tt.sz, sz)
+        assert tt.timestamp == t
+        assert tt.key == k
+        assert tt.val == v
+        assert tt.sz == sz
 
-    def test_KV_serialisation(self) -> None:
-        tests: typing.List[KeyValue] = [
+    @pytest.mark.parametrize(
+        "tt",
+        [
             KeyValue(10, "hello", "world", HEADER_SIZE + 10),
             KeyValue(0, "", "", HEADER_SIZE),
-        ]
-        for tt in tests:
-            self.kv_test(tt)
+        ],
+    )
+    def test_KV_serialisation(self, tt: KeyValue) -> None:
+        self.kv_test(tt)
 
     def test_random(self) -> None:
         for _ in range(100):

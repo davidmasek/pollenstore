@@ -1,101 +1,68 @@
 import os
 import tempfile
-import typing
-import unittest
+from typing import Iterator
+
+import pytest
 
 from pollen.disk_store import DiskStorage
 
 
-class TempStorageFile:
+@pytest.fixture(scope="function")
+def temp_db_path() -> Iterator[str]:
     """
-    TempStorageFile provides a wrapper over the temporary files which are used in
-    testing.
-
-    Python has two APIs to create temporary files, tempfile.TemporaryFile and
-    tempfile.mkstemp. Files created by tempfile.TemporaryFile gets deleted as soon as
-    they are closed. Since we need to do tests for persistence, we might open and
-    close a file multiple times. Files created using tempfile.mkstemp don't have this
-    limitation, but they have to deleted manually. They don't get deleted when the file
-    descriptor is out scope or our program has exited.
-
-    Args:
-        path (str): path to the file where our data needs to be stored. If the path
-            parameter is empty, then a temporary will be created using tempfile API
+    Uses tempfile.mkstemp (instead of tempfile.TemporaryFile) for persistent files.
     """
+    fd, path = tempfile.mkstemp()
+    os.close(fd)
 
-    def __init__(self, path: typing.Optional[str] = None):
-        if path:
-            self.path = path
-            return
+    yield path
 
-        fd, self.path = tempfile.mkstemp()
-        os.close(fd)
-
-    def clean_up(self) -> None:
-        # NOTE: you might be tempted to use the destructor method `__del__`, however
-        # destructor method gets called whenever the object goes out of scope, and it
-        # will delete our database file. Having a separate method would give us better
-        # control.
-        os.remove(self.path)
+    os.remove(path)
 
 
-class TestDiskCDB(unittest.TestCase):
-    def setUp(self) -> None:
-        self.file: TempStorageFile = TempStorageFile()
-
-    def tearDown(self) -> None:
-        self.file.clean_up()
-
-    def test_get(self) -> None:
-        store = DiskStorage(file_name=self.file.path)
-        store.set("name", "jojo")
-        self.assertEqual(store.get("name"), "jojo")
-        store.close()
-
-    def test_invalid_key(self) -> None:
-        store = DiskStorage(file_name=self.file.path)
-        self.assertEqual(store.get("some key"), "")
-        store.close()
-
-    def test_dict_api(self) -> None:
-        store = DiskStorage(file_name=self.file.path)
-        store["name"] = "jojo"
-        self.assertEqual(store["name"], "jojo")
-        store.close()
-
-    def test_persistence(self) -> None:
-        store = DiskStorage(file_name=self.file.path)
-
-        tests = {
-            "crime and punishment": "dostoevsky",
-            "anna karenina": "tolstoy",
-            "war and peace": "tolstoy",
-            "hamlet": "shakespeare",
-            "othello": "shakespeare",
-            "brave new world": "huxley",
-            "dune": "frank herbert",
-        }
-        for k, v in tests.items():
-            store.set(k, v)
-            self.assertEqual(store.get(k), v)
-        store.close()
-
-        store = DiskStorage(file_name=self.file.path)
-        for k, v in tests.items():
-            self.assertEqual(store.get(k), v)
-        store.close()
+def test_get(temp_db_path: str) -> None:
+    """Test basic get/set functionality."""
+    store = DiskStorage(file_name=temp_db_path)
+    store.set("name", "jojo")
+    assert store.get("name") == "jojo"
+    store.close()
 
 
-class TestDiskCDBExistingFile(unittest.TestCase):
-    def test_get_new_file(self) -> None:
-        t = TempStorageFile(path="temp.db")
-        store = DiskStorage(file_name=t.path)
-        store.set("name", "jojo")
-        self.assertEqual(store.get("name"), "jojo")
-        store.close()
+def test_missing_key(temp_db_path: str) -> None:
+    """Test getting a non-existent key returns an empty string."""
+    store = DiskStorage(file_name=temp_db_path)
+    assert store.get("some key") == ""
+    store.close()
 
-        # check for key again
-        store = DiskStorage(file_name=t.path)
-        self.assertEqual(store.get("name"), "jojo")
-        store.close()
-        t.clean_up()
+
+def test_dict_api(temp_db_path: str) -> None:
+    """Test the dictionary-style __getitem__ and __setitem__."""
+    store = DiskStorage(file_name=temp_db_path)
+    store["name"] = "jojo"
+    assert store["name"] == "jojo"
+    store.close()
+
+
+def test_persistence(temp_db_path: str) -> None:
+    """Test that data persists after closing and reopening the store."""
+    store = DiskStorage(file_name=temp_db_path)
+
+    tests = {
+        "crime and punishment": "dostoevsky",
+        "anna karenina": "tolstoy",
+        "war and peace": "tolstoy",
+        "hamlet": "shakespeare",
+        "othello": "shakespeare",
+        "brave new world": "huxley",
+        "dune": "frank herbert",
+    }
+    for k, v in tests.items():
+        store.set(k, v)
+        assert store.get(k) == v
+    store.close()
+
+    # Reopen the store to check for persistence
+    store = DiskStorage(file_name=temp_db_path)
+    for k, v in tests.items():
+        assert store.get(k) == v
+    store.close()
