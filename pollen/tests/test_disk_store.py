@@ -27,6 +27,39 @@ def test_get(temp_db_path: str) -> None:
     assert store.get("name") == "jojo"
     store.close()
 
+    # check persistence
+    store = DiskStorage(file_name=temp_db_path)
+    assert store.get("name") == "jojo"
+    store.close()
+
+def test_remove(temp_db_path: str) -> None:
+    store = DiskStorage(file_name=temp_db_path)
+    store.set("name", "jojo")
+    store.remove("name")
+    assert store.get("name") == ""
+    store.close()
+
+    # check persistence
+    store = DiskStorage(file_name=temp_db_path)
+    assert store.get("name") == ""
+    store.close()
+
+
+def test_list(temp_db_path: str) -> None:
+    store = DiskStorage(file_name=temp_db_path)
+    store.set("alpha", "xyz")
+    store.set("beta", "xyz")
+    store.set("alpha", "foo")
+    assert set(store.list()) == {"alpha", "beta"}
+    store.remove("alpha")
+    assert set(store.list()) == {"beta"}
+    store.close()
+
+    # check persistence
+    store = DiskStorage(file_name=temp_db_path)
+    assert set(store.list()) == {"beta"}
+    store.close()
+
 
 def test_missing_key(temp_db_path: str) -> None:
     """Test getting a non-existent key returns an empty string."""

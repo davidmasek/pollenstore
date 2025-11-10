@@ -104,7 +104,11 @@ class DiskStorage:
                     position=self.write_position,
                     size=total_size,
                 )
-                self.key_dir[key] = kv
+                # deleted keys will have empty value
+                if value_size > 0:
+                    self.key_dir[key] = kv
+                else:
+                    self.key_dir.pop(key)
                 self.write_position += total_size
         print(f"--- loaded {len(self.key_dir):,} keys ---")
 
