@@ -9,23 +9,23 @@ default: check
 
 check:
 	@echo "$(CYAN)--- Running ruff import sorting checks (I)... ---$(RESET)"
-	@ruff check --select I .
+	@uv run ruff check --select I .
 	@echo "$(CYAN)--- Running all ruff checks... ---$(RESET)"
-	@ruff check .
+	@uv run ruff check .
 	@echo "$(CYAN)--- Running pyright type checks... ---$(RESET)"
-	@pyright
+	@uv run pyright
 	@echo "$(GREEN)✅ All checks passed!$(RESET)"
 
 format:
 	@echo "$(CYAN)--- Fixing ruff import sorting (I)... ---$(RESET)"
-	@ruff check --select I --fix .
+	@uv run ruff check --select I --fix .
 	@echo "$(CYAN)--- Formatting code with ruff... ---$(RESET)"
-	@ruff format .
+	@uv run ruff format .
 	@echo "$(GREEN)✅ Code formatted!$(RESET)"
 
 test:
 	@echo "$(CYAN)--- Testing... ---$(RESET)"
-	@pytest pollen
+	@uv run pytest pollen
 	@echo "$(GREEN)✅ Pass!$(RESET)"
 
 commit:
