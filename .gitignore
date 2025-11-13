@@ -209,3 +209,4 @@ __marimo__/
 # --- Project ---
 # ignore all .db files
 *.db
+.DS_Store
